@@ -1,93 +1,91 @@
-package com.compressor.model;
+package com.compressor.model; // Define el paquete del modelo
 
-import java.io.*;
-import java.util.List;
-import java.util.concurrent.*;
-import java.util.zip.*;
+import java.io.*; // Importa clases para manejar archivos
+import java.util.List; // Importa la clase List para manejar listas de archivos
+import java.util.concurrent.*; // Importa clases para manejo de concurrencia
+import java.util.zip.*; // Importa clases para manejar archivos ZIP
 
-public class FileCompressor {
-    private List<File> filesToCompress;
-    private String outputPath;
-    private CompressionListener listener;
+public class FileCompressor { // Clase que maneja la compresión de archivos
+    private List<File> filesToCompress; // Lista de archivos a comprimir
+    private String outputPath; // Ruta del archivo ZIP de salida
+    private CompressionListener listener; // Listener para notificar el progreso
 
-    public interface CompressionListener {
-        void onProgressUpdate(int fileIndex, int progress);
-        void onFileComplete(int fileIndex);
-        void onCompressionComplete();
-        void onError(File file, Exception e);
+    public interface CompressionListener { // Interfaz para manejar eventos de compresión
+        void onProgressUpdate(int fileIndex, int progress); // Se llama cuando hay progreso
+        void onFileComplete(int fileIndex); // Se llama cuando un archivo se completa
+        void onCompressionComplete(); // Se llama cuando la compresión termina
+        void onError(File file, Exception e); // Se llama cuando ocurre un error
     }
 
-    public FileCompressor() {}
+    public FileCompressor() {} // Constructor vacío
 
-    public void setFilesToCompress(List<File> files) {
+    public void setFilesToCompress(List<File> files) { // Establece los archivos a comprimir
         this.filesToCompress = files;
     }
 
-    public void setOutputPath(String path) {
+    public void setOutputPath(String path) { // Establece la ruta de salida del ZIP
         this.outputPath = path;
     }
 
-    public void setCompressionListener(CompressionListener listener) {
+    public void setCompressionListener(CompressionListener listener) { // Asigna el listener
         this.listener = listener;
     }
 
-    public boolean startCompression() {
-        if (filesToCompress == null || filesToCompress.isEmpty() || outputPath == null) {
+    public boolean startCompression() { // Inicia la compresión de archivos
+        if (filesToCompress == null || filesToCompress.isEmpty() || outputPath == null) { // Verifica que haya archivos y ruta
             return false;
         }
-
-        try (FileOutputStream fos = new FileOutputStream(outputPath);
+        
+        try (FileOutputStream fos = new FileOutputStream(outputPath); // Crea el archivo ZIP
              ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(fos))) {
-
-            // Process files sequentially to avoid ZIP entry conflicts
+            
             for (int i = 0; i < filesToCompress.size(); i++) {
                 try {
-                    compressSingleFile(filesToCompress.get(i), zos, i);
+                    compressSingleFile(filesToCompress.get(i), zos, i); // Comprime cada archivo
                 } catch (IOException e) {
                     if (listener != null) {
-                        listener.onError(filesToCompress.get(i), e);
+                        listener.onError(filesToCompress.get(i), e); // Notifica si hay error
                     }
                     return false;
                 }
             }
-
+            
             if (listener != null) {
-                listener.onCompressionComplete();
+                listener.onCompressionComplete(); // Notifica que la compresión terminó
             }
             return true;
         } catch (IOException e) {
             if (listener != null) {
-                listener.onError(null, e);
+                listener.onError(null, e); // Notifica error general
             }
             return false;
         }
     }
 
-    private void compressSingleFile(File file, ZipOutputStream zos, int fileIndex) throws IOException {
-        byte[] buffer = new byte[8192];
+    private void compressSingleFile(File file, ZipOutputStream zos, int fileIndex) throws IOException { // Comprime un archivo
+        byte[] buffer = new byte[8192]; // Tamaño del buffer de lectura
         int bytesRead;
-        long totalBytes = file.length();
-        long processedBytes = 0;
+        long totalBytes = file.length(); // Tamaño total del archivo
+        long processedBytes = 0; // Bytes procesados hasta ahora
 
-        // Create ZIP entry
-        ZipEntry zipEntry = new ZipEntry(file.getName());
+        ZipEntry zipEntry = new ZipEntry(file.getName()); // Crea una entrada ZIP para el archivo
         zos.putNextEntry(zipEntry);
-
-        try (FileInputStream fis = new FileInputStream(file)) {
+        
+        try (FileInputStream fis = new FileInputStream(file)) { // Lee el archivo
             while ((bytesRead = fis.read(buffer)) != -1) {
-                zos.write(buffer, 0, bytesRead);
+                zos.write(buffer, 0, bytesRead); // Escribe en el ZIP
                 processedBytes += bytesRead;
-                int progress = (int) ((processedBytes * 100) / totalBytes);
+                int progress = (int) ((processedBytes * 100) / totalBytes); // Calcula el progreso
+                
                 if (listener != null) {
-                    listener.onProgressUpdate(fileIndex, progress);
+                    listener.onProgressUpdate(fileIndex, progress); // Notifica el progreso
                 }
             }
         }
-
-        zos.closeEntry();
+        zos.closeEntry(); // Cierra la entrada ZIP
         
         if (listener != null) {
-            listener.onFileComplete(fileIndex);
+            listener.onFileComplete(fileIndex); // Notifica que el archivo se completó
         }
     }
 }
