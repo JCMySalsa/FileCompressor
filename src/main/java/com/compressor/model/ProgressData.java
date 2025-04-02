@@ -57,9 +57,17 @@ public class ProgressData {
     public void updateCurrentFileProgress(String fileName, long fileSize, long bytesProcessed) {
         this.currentFileName = fileName;
         this.currentFileSize = fileSize;
-        this.currentFileProgress = (int) ((bytesProcessed * 100) / fileSize);
-        this.processedBytes += bytesProcessed - (currentFileSize * processedFiles / Math.max(1, totalFiles));
-        
+     // Evitar división por cero y valores negativos
+        if (fileSize > 0) {
+            this.currentFileProgress = Math.max(0, Math.min(100, (int) ((bytesProcessed * 100) / fileSize)));
+        } else {
+            this.currentFileProgress = 0;
+        }
+
+        // Corregir el cálculo de processedBytes
+        long newProcessedBytes = processedBytes + bytesProcessed;
+        this.processedBytes = Math.max(0, Math.min(totalBytes, newProcessedBytes));
+
         // Calcular tiempo restante
         calculateRemainingTime();
     }
