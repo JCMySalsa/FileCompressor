@@ -16,14 +16,14 @@ public class App {
             FileCompressor compressor = new FileCompressor();
             ProgressData progressData = new ProgressData();
             
-            // Initialize view
+            // Inicializa view
             MainFrame mainFrame = new MainFrame();
             
-            // Initialize controller
+            // Inicializa controller
             FileCompressionController controller = new FileCompressionController(
                 selectionModel, compressor, progressData, mainFrame);
             
-            // Show the main frame
+            // Muestra el main frame
             mainFrame.setVisible(true);
         });
     }
