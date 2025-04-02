@@ -11,7 +11,7 @@ import com.compressor.view.MainFrame;
 public class App {
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            // Initialize models
+            // Inicializa los modelos
             FileSelectionModel selectionModel = new FileSelectionModel();
             FileCompressor compressor = new FileCompressor();
             ProgressData progressData = new ProgressData();
