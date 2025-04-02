@@ -16,32 +16,36 @@ public class ProgressDialog extends JDialog {
     private boolean userCancelled;
 
     public ProgressDialog(JFrame parent) {
-        super(parent, "Progreso de Compresión", true);
+        super(parent, "Compression Progress", true);
         initializeUI();
         setupLayout();
         configureDialog();
     }
 
     private void initializeUI() {
+        // Overall progress components
         overallProgressBar = new JProgressBar(0, 100);
         overallProgressBar.setStringPainted(true);
+        overallProgressLabel = new JLabel("Overall progress: 0%");
         
+        // Current file progress components
         currentFileProgressBar = new JProgressBar(0, 100);
         currentFileProgressBar.setStringPainted(true);
-        
-        currentFileLabel = new JLabel("Archivo actual: ");
+        currentFileLabel = new JLabel("Current file: ");
         currentFileLabel.setFont(currentFileLabel.getFont().deriveFont(Font.BOLD));
         
-        overallProgressLabel = new JLabel("Progreso general: 0%");
-        timeRemainingLabel = new JLabel("Tiempo estimado: --");
-        processedSizeLabel = new JLabel("Procesados: 0 MB de 0 MB");
+        // Information labels
+        timeRemainingLabel = new JLabel("Time remaining: calculating...");
+        processedSizeLabel = new JLabel("Processed: 0 MB of 0 MB");
 
-        cancelButton = new JButton("Cancelar");
+        // Cancel button
+        cancelButton = new JButton("Cancel");
         cancelButton.addActionListener(e -> {
             userCancelled = true;
             setVisible(false);
         });
 
+        // Window listener to handle close button
         this.addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
@@ -51,68 +55,71 @@ public class ProgressDialog extends JDialog {
     }
 
     private void setupLayout() {
-        JPanel mainPanel = new JPanel(new GridBagLayout());
+        JPanel mainPanel = new JPanel();
+        mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.Y_AXIS));
         mainPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+
+        // Current file section
+        JPanel currentFilePanel = new JPanel(new BorderLayout(5, 5));
+        currentFilePanel.add(currentFileLabel, BorderLayout.NORTH);
+        currentFilePanel.add(currentFileProgressBar, BorderLayout.CENTER);
         
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(5, 5, 5, 5);
-        gbc.anchor = GridBagConstraints.WEST;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
+        // Overall progress section
+        JPanel overallPanel = new JPanel(new BorderLayout(5, 5));
+        overallPanel.add(overallProgressLabel, BorderLayout.NORTH);
+        overallPanel.add(overallProgressBar, BorderLayout.CENTER);
+        
+        // Info section
+        JPanel infoPanel = new JPanel(new GridLayout(2, 1, 5, 5));
+        infoPanel.add(processedSizeLabel);
+        infoPanel.add(timeRemainingLabel);
+        
+        // Add sections to main panel
+        mainPanel.add(currentFilePanel);
+        mainPanel.add(Box.createVerticalStrut(10));
+        mainPanel.add(overallPanel);
+        mainPanel.add(Box.createVerticalStrut(10));
+        mainPanel.add(infoPanel);
+        mainPanel.add(Box.createVerticalStrut(15));
+        mainPanel.add(cancelButton);
 
-        gbc.gridx = 0;
-        gbc.gridy = 0;
-        mainPanel.add(currentFileLabel, gbc);
-
-        gbc.gridy = 1;
-        mainPanel.add(currentFileProgressBar, gbc);
-
-        gbc.gridy = 2;
-        mainPanel.add(new JSeparator(), gbc);
-
-        gbc.gridy = 3;
-        mainPanel.add(overallProgressLabel, gbc);
-
-        gbc.gridy = 4;
-        mainPanel.add(overallProgressBar, gbc);
-
-        gbc.gridy = 5;
-        mainPanel.add(processedSizeLabel, gbc);
-
-        gbc.gridy = 6;
-        mainPanel.add(timeRemainingLabel, gbc);
-
-        gbc.gridy = 7;
-        gbc.anchor = GridBagConstraints.CENTER;
-        mainPanel.add(cancelButton, gbc);
-
+        // Center the cancel button
+        cancelButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        
         this.add(mainPanel);
     }
 
     private void configureDialog() {
         this.setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
-        this.setSize(500, 350);
+        this.setSize(400, 300);
         this.setLocationRelativeTo(getParent());
         this.setResizable(false);
     }
 
     public void updateCurrentFile(String fileName, int progress) {
-        currentFileLabel.setText("Archivo actual: " + fileName);
-        currentFileProgressBar.setValue(progress);
-        currentFileProgressBar.setString(progress + "%");
+        SwingUtilities.invokeLater(() -> {
+            currentFileLabel.setText("Current file: " + fileName);
+            currentFileProgressBar.setValue(progress);
+            currentFileProgressBar.setString(progress + "%");
+        });
     }
 
     public void updateOverallProgress(int progress, String processedSize, 
                                     String totalSize, String timeRemaining) {
-        overallProgressBar.setValue(progress);
-        overallProgressBar.setString(progress + "%");
-        overallProgressLabel.setText("Progreso general: " + progress + "%");
-        processedSizeLabel.setText("Procesados: " + processedSize + " de " + totalSize);
-        timeRemainingLabel.setText("Tiempo estimado: " + timeRemaining);
+        SwingUtilities.invokeLater(() -> {
+            overallProgressBar.setValue(progress);
+            overallProgressBar.setString(progress + "%");
+            overallProgressLabel.setText("Overall progress: " + progress + "%");
+            processedSizeLabel.setText("Processed: " + processedSize + " of " + totalSize);
+            timeRemainingLabel.setText("Time remaining: " + timeRemaining);
+        });
     }
 
     public void showDialog() {
         userCancelled = false;
-        setVisible(true);
+        SwingUtilities.invokeLater(() -> {
+            setVisible(true);
+        });
     }
 
     public boolean isCancelled() {
@@ -120,12 +127,14 @@ public class ProgressDialog extends JDialog {
     }
 
     public void showCompletion(boolean success) {
-        if (success) {
-            JOptionPane.showMessageDialog(this, 
-                "Compresión completada con éxito!", 
-                "Completado", 
-                JOptionPane.INFORMATION_MESSAGE);
-        }
-        setVisible(false);
+        SwingUtilities.invokeLater(() -> {
+            if (success) {
+                JOptionPane.showMessageDialog(this, 
+                    "Compression completed successfully!", 
+                    "Completed", 
+                    JOptionPane.INFORMATION_MESSAGE);
+            }
+            setVisible(false);
+        });
     }
 }

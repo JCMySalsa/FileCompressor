@@ -21,7 +21,7 @@ public class App {
             
             // Initialize controller
             FileCompressionController controller = new FileCompressionController(
-                selectionModel, compressor, progressData, mainFrame);
+                selectionModel, compressor, mainFrame);
             
             // Show the main frame
             mainFrame.setVisible(true);
