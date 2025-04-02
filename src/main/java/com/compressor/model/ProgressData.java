@@ -63,8 +63,6 @@ public class ProgressData {
         } else {
             this.currentFileProgress = 0;
         }
-
-        // Corregir el cálculo de processedBytes
         long newProcessedBytes = processedBytes + bytesProcessed;
         this.processedBytes = Math.max(0, Math.min(totalBytes, newProcessedBytes));
 

@@ -43,7 +43,7 @@ public class FileSelectionModel {
      * 
      * @param files Archivos seleccionados
      */
-    public void addFiles(List<File> files) {
+    public void addFiles(List<File> files) { //de donde se llena esa lista
         if (files != null) {
             for (File file : files) {
                 if (!selectedFiles.contains(file)) { // Evita duplicados
