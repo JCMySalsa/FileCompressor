@@ -1,98 +1,129 @@
 package com.compressor.controller;
 
-import java.io.*;
+import com.compressor.model.*;
+import com.compressor.view.*;
+import java.io.File;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
 
-/**
- * Controlador encargado de manejar la compresión de archivos en hilos separados.
- * Utiliza un ExecutorService para gestionar múltiples tareas de compresión simultáneamente.
- */
+import javax.swing.JFileChooser;
+import javax.swing.SwingUtilities;
+
 public class FileCompressionController {
-    private ExecutorService executorService; // Pool de hilos para manejar la compresión
-    private CompressionProgressListener listener; // Interfaz para actualizar la UI con el progreso
-    private final Object zipLock = new Object(); // Objeto para sincronizar el acceso al ZIP
+    private FileSelectionModel selectionModel;
+    private FileCompressor compressor;
+    private ProgressData progressData;
+    private MainFrame mainView;
+    private ProgressDialog progressDialog;
+    private ExecutorService executor;
     
-    /**
-     * Constructor que inicializa el controlador con un listener para actualizar el progreso.
-     * @param listener Interfaz para recibir actualizaciones de progreso.
-     */
-    public FileCompressionController(CompressionProgressListener listener) {
-        this.executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-        this.listener = listener;
+    public FileCompressionController(FileSelectionModel selectionModel, 
+                                   FileCompressor compressor,
+                                   ProgressData progressData,
+                                   MainFrame mainView) {
+        this.selectionModel = selectionModel;
+        this.compressor = compressor;
+        this.progressData = progressData;
+        this.mainView = mainView;
+        this.progressDialog = new ProgressDialog(mainView);
+        this.executor = Executors.newSingleThreadExecutor();
+        
+        setupEventHandlers();
     }
-
-    /**
-     * Método para iniciar la compresión de una lista de archivos en un solo ZIP.
-     * @param files Lista de archivos a comprimir.
-     * @param outputZipPath Ruta de salida del archivo ZIP.
-     */
-    public void compressFiles(List<File> files, String outputZipPath) {
-        try (FileOutputStream fos = new FileOutputStream(outputZipPath);
-             ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(fos))) {
+    
+    private void setupEventHandlers() {
+        mainView.addSelectFilesListener(e -> handleFileSelection());
+        mainView.addCompressListener(e -> handleCompression());
+        mainView.addCancelListener(e -> handleCancellation());
+    }
+    
+    private void handleFileSelection() {
+        if (selectionModel.showFileSelectionDialog()) {
+            mainView.updateFileList(selectionModel.getSelectedFileNames());
+            mainView.updateFileInfo(
+                selectionModel.getFileCount(), 
+                selectionModel.getFormattedTotalSize());
+        }
+    }
+    
+    private void handleCompression() {
+        List<File> files = selectionModel.getSelectedFiles();
+        if (files.isEmpty()) {
+            mainView.showError("No hay archivos seleccionados");
+            return;
+        }
+        
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Guardar archivo ZIP");
+        fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+        
+        if (fileChooser.showSaveDialog(mainView) == JFileChooser.APPROVE_OPTION) {
+            String outputPath = fileChooser.getSelectedFile().getAbsolutePath() + "/compressed.zip";
             
-            for (File file : files) {
-                executorService.submit(() -> compressFile(file, zos));
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * Método que comprime un archivo individualmente y actualiza el progreso.
-     * Se usa sincronización para evitar accesos simultáneos al ZipOutputStream.
-     * @param file Archivo a comprimir.
-     * @param zos OutputStream compartido para escribir en el ZIP.
-     */
-    private void compressFile(File file, ZipOutputStream zos) {
-        try {
-            byte[] buffer = new byte[1024];
-            int bytesRead;
-            long totalBytes = file.length();
-            long compressedBytes = 0;
-
-            try (FileInputStream fis = new FileInputStream(file)) {
-                synchronized (zipLock) {
-                    ZipEntry zipEntry = new ZipEntry(file.getName());
-                    zos.putNextEntry(zipEntry);
+            progressData.initialize(files.size(), selectionModel.getTotalSize());
+            compressor.setFilesToCompress(files);
+            compressor.setOutputPath(outputPath);
+            compressor.setCompressionListener(new FileCompressor.CompressionListener() {
+                @Override
+                public void onProgressUpdate(int fileIndex, int progress) {
+                    File file = files.get(fileIndex);
+                    progressData.updateCurrentFileProgress(
+                        file.getName(), file.length(), 
+                        (long) (file.length() * progress / 100.0));
+                    
+                    SwingUtilities.invokeLater(() -> {
+                        progressDialog.updateCurrentFile(
+                            file.getName(), progress);
+                        progressDialog.updateOverallProgress(
+                            progressData.getOverallProgress(),
+                            progressData.getProcessedSize(),
+                            progressData.getTotalSize(),
+                            progressData.getFormattedRemainingTime());
+                    });
                 }
-
-                while ((bytesRead = fis.read(buffer)) != -1) {
-                    synchronized (zipLock) {
-                        zos.write(buffer, 0, bytesRead);
+                
+                @Override
+                public void onFileComplete(int fileIndex) {
+                    progressData.completeCurrentFile();
+                }
+                
+                @Override
+                public void onCompressionComplete() {
+                    SwingUtilities.invokeLater(() -> {
+                        progressDialog.showCompletion(true);
+                        mainView.showCompletion(true);
+                    });
+                }
+                
+                @Override
+                public void onError(File file, Exception e) {
+                    SwingUtilities.invokeLater(() -> {
+                        progressDialog.showCompletion(false);
+                        mainView.showError("Error al comprimir: " + e.getMessage());
+                    });
+                }
+            });
+            
+            mainView.showProgress(true);
+            progressDialog.showDialog();
+            
+            executor.execute(() -> {
+                boolean success = compressor.startCompression();
+                SwingUtilities.invokeLater(() -> {
+                    mainView.showProgress(false);
+                    if (!success && !progressDialog.isCancelled()) {
+                        mainView.showError("Error durante la compresión");
                     }
-                    compressedBytes += bytesRead;
-                    int progress = (int) ((compressedBytes * 100) / totalBytes);
-                    listener.onProgressUpdate(file, progress);
-                }
-
-                synchronized (zipLock) {
-                    zos.closeEntry(); // Cierra la entrada del archivo en el ZIP
-                }
-            }
-            listener.onCompressionComplete(file);
-        } catch (IOException e) {
-            listener.onCompressionError(file, e);
+                });
+            });
         }
     }
-
-    /**
-     * Método para cerrar el ExecutorService y liberar los recursos.
-     */
-    public void shutdown() {
-        executorService.shutdown();
+    
+    private void handleCancellation() {
+        compressor.cancelCompression();
+        progressDialog.setVisible(false);
+        mainView.showProgress(false);
+        mainView.showError("Compresión cancelada por el usuario");
     }
-}
-
-/**
- * Interfaz para manejar las actualizaciones de progreso y errores durante la compresión.
- */
-interface CompressionProgressListener {
-    void onProgressUpdate(File file, int progress); // Actualiza el progreso de compresión
-    void onCompressionComplete(File file); // Notifica cuando la compresión ha terminado
-    void onCompressionError(File file, Exception e); // Maneja errores de compresión
 }
