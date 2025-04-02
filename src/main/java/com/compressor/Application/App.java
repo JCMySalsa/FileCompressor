@@ -13,18 +13,20 @@ public class App {
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             // Inicializa modelo
+
+            // Inicializa los modelos
             FileSelectionModel selectionModel = new FileSelectionModel();
             FileCompressor compressor = new FileCompressor();
             ProgressData progressData = new ProgressData();
             
-            // Initialize view
+            // Inicializa view
             MainFrame mainFrame = new MainFrame();
             
-            // Initialize controller
+            // Inicializa controller
             FileCompressionController controller = new FileCompressionController(
                 selectionModel, compressor, mainFrame);
             
-            // Show the main frame
+            // Muestra el main frame
             mainFrame.setVisible(true);
         });
     }
