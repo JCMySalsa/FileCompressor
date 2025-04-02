@@ -1,155 +1,139 @@
-package com.compressor.model;
+package com.compressor.model; // Define el paquete del modelo
+
+import java.io.File; // Importa la clase File para manejar archivos
+import java.util.ArrayList; // Importa ArrayList para manejar listas de archivos
+import java.util.List; // Importa la clase List
+import javax.swing.JFileChooser; // Importa JFileChooser para seleccionar archivos
+import javax.swing.filechooser.FileNameExtensionFilter; // Filtro para tipos de archivo
 
 /**
- * Modelo para almacenar y gestionar datos de progreso durante la compresión
+ * Modelo para manejar la selección de archivos
  */
-public class ProgressData {
-    private int totalFiles;
-    private int processedFiles;
-    private int currentFileProgress;
-    private String currentFileName;
-    private long totalBytes;
-    private long processedBytes;
-    private long currentFileSize;
-    private String currentStatus;
-    private long startTime;
-    private long estimatedRemainingTime;
+public class FileSelectionModel {
+    private List<File> selectedFiles; // Lista de archivos seleccionados
+    private File lastDirectory; // Último directorio usado
 
-    public ProgressData() {
-        reset();
+    public FileSelectionModel() { // Constructor que inicializa la lista y el directorio
+        this.selectedFiles = new ArrayList<>();
+        this.lastDirectory = new File(System.getProperty("user.home")); // Directorio inicial: carpeta del usuario
     }
 
-    /**
-     * Reinicia todos los datos de progreso
-     */
-    public void reset() {
-        this.totalFiles = 0;
-        this.processedFiles = 0;
-        this.currentFileProgress = 0;
-        this.currentFileName = "";
-        this.totalBytes = 0;
-        this.processedBytes = 0;
-        this.currentFileSize = 0;
-        this.currentStatus = "Listo";
-        this.startTime = 0;
-        this.estimatedRemainingTime = 0;
-    }
+    public boolean showFileSelectionDialog() { // Muestra el cuadro de diálogo para seleccionar archivos
+        JFileChooser fileChooser = new JFileChooser(); // Crea un selector de archivos
+        fileChooser.setCurrentDirectory(lastDirectory); // Establece el directorio inicial
+        fileChooser.setMultiSelectionEnabled(true); // Permite seleccionar varios archivos
+        fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY); // Solo permite seleccionar archivos
 
-    /**
-     * Inicializa los datos para una nueva operación de compresión
-     * @param totalFiles Número total de archivos a procesar
-     * @param totalBytes Tamaño total en bytes de todos los archivos
-     */
-    public void initialize(int totalFiles, long totalBytes) {
-        this.totalFiles = totalFiles;
-        this.totalBytes = totalBytes;
-        this.processedFiles = 0;
-        this.processedBytes = 0;
-        this.startTime = System.currentTimeMillis();
-    }
+        FileNameExtensionFilter filter = new FileNameExtensionFilter( // Filtro para tipos de archivo
+            "Archivos comunes (*.txt, *.pdf, *.jpg, *.png)", "txt", "pdf", "jpg", "png", "doc", "docx", "xls", "xlsx"
+        );
+        fileChooser.setFileFilter(filter); // Aplica el filtro
 
-    /**
-     * Actualiza el progreso del archivo actual
-     * @param fileName Nombre del archivo en procesamiento
-     * @param fileSize Tamaño del archivo en bytes
-     * @param bytesProcessed Bytes procesados del archivo actual
-     */
-    public void updateCurrentFileProgress(String fileName, long fileSize, long bytesProcessed) {
-        this.currentFileName = fileName;
-        this.currentFileSize = fileSize;
-        this.currentFileProgress = (int) ((bytesProcessed * 100) / fileSize);
-        this.processedBytes += bytesProcessed - (currentFileSize * processedFiles / Math.max(1, totalFiles));
-        
-        // Calcular tiempo restante
-        calculateRemainingTime();
-    }
-
-    /**
-     * Marca el archivo actual como completado
-     */
-    public void completeCurrentFile() {
-        this.processedFiles++;
-        this.processedBytes += currentFileSize;
-        this.currentFileProgress = 100;
-        calculateRemainingTime();
-    }
-
-    /**
-     * Calcula el tiempo estimado restante
-     */
-    private void calculateRemainingTime() {
-        if (processedBytes <= 0 || totalBytes <= 0) {
-            estimatedRemainingTime = 0;
-            return;
+        int result = fileChooser.showOpenDialog(null); // Abre el diálogo
+        if (result == JFileChooser.APPROVE_OPTION) { // Si el usuario selecciona archivos
+            this.lastDirectory = fileChooser.getCurrentDirectory(); // Guarda el directorio
+            addFiles(List.of(fileChooser.getSelectedFiles())); // Agrega los archivos seleccionados
+            return true;
         }
-
-        long elapsedTime = System.currentTimeMillis() - startTime;
-        double speed = (double) processedBytes / elapsedTime; // bytes/ms
-        long remainingBytes = totalBytes - processedBytes;
-        
-        estimatedRemainingTime = (long) (remainingBytes / speed);
+        return false; // Si no se seleccionan archivos
     }
 
     /**
-     * Actualiza el estado del proceso
-     * @param status Nuevo estado
+     * Agrega archivos a la selección
+     * 
+     * @param files Archivos seleccionados
      */
-    public void setStatus(String status) {
-        this.currentStatus = status;
-    }
-
-    // Métodos de acceso (getters)
-    public int getTotalFiles() {
-        return totalFiles;
-    }
-
-    public int getProcessedFiles() {
-        return processedFiles;
-    }
-
-    public int getCurrentFileProgress() {
-        return currentFileProgress;
-    }
-
-    public String getCurrentFileName() {
-        return currentFileName;
-    }
-
-    public int getOverallProgress() {
-        if (totalBytes == 0) return 0;
-        return (int) ((processedBytes * 100) / totalBytes);
-    }
-
-    public String getCurrentStatus() {
-        return currentStatus;
-    }
-
-    public String getFormattedRemainingTime() {
-        long seconds = estimatedRemainingTime / 1000;
-        long minutes = seconds / 60;
-        long hours = minutes / 60;
-        
-        if (hours > 0) {
-            return String.format("%d h %02d min", hours, minutes % 60);
-        } else if (minutes > 0) {
-            return String.format("%d min %02d s", minutes, seconds % 60);
-        } else {
-            return String.format("%d s", seconds);
+    public void addFiles(List<File> files) {
+        if (files != null) {
+            for (File file : files) {
+                if (!selectedFiles.contains(file)) { // Evita duplicados
+                    selectedFiles.add(file);
+                }
+            }
         }
     }
 
-    public String getProcessedSize() {
-        return formatFileSize(processedBytes);
+    /**
+     * Elimina un archivo de la selección
+     * 
+     * @param file Archivo a remover
+     */
+    public boolean removeFile(File file) {
+        return selectedFiles.remove(file);
     }
 
-    public String getTotalSize() {
-        return formatFileSize(totalBytes);
+    public void removeFileIndex(int[] indices) { // Elimina archivos según índice
+        for (int i = indices.length - 1; i >= 0; i--) { // Se elimina en orden inverso para evitar errores
+            if (indices[i] >= 0 && indices[i] < selectedFiles.size()) {
+                selectedFiles.remove(indices[i]);
+            }
+        }
     }
 
-    private String formatFileSize(long bytes) {
+    /**
+     * Obtiene los archivos seleccionados
+     * 
+     * @return Lista de archivos
+     */
+    public List<File> getSelectedFiles() {
+        return List.copyOf(selectedFiles); // Devuelve una copia de la lista
+    }
+
+    /**
+     * Obtiene los nombres de los archivos seleccionados
+     * 
+     * @return Array de nombres
+     */
+    public String[] getSelectedFileNames() {
+        return selectedFiles.stream()
+                             .map(File::getName) // Obtiene los nombres de archivo
+                             .toArray(String[]::new);
+    }
+
+    /**
+     * Limpia la selección actual
+     */
+    public void clearSelection() {
+        selectedFiles.clear();
+    }
+
+    /**
+     * Verifica si hay archivos seleccionados
+     * 
+     * @return true si hay archivos seleccionados
+     */
+    public boolean hasFiles() {
+        return !selectedFiles.isEmpty(); // Devuelve true si la lista no está vacía
+    }
+
+    /**
+     * Obtiene el tamaño total de los archivos seleccionados
+     * 
+     * @return tamaño total en bytes
+     */
+    public long getTotalSize() {
+        return selectedFiles.stream().mapToLong(File::length).sum(); // Suma los tamaños de los archivos
+    }
+
+    /**
+     * Obtiene el tamaño total formateado (KB, MB, GB)
+     * 
+     * @return Cadena con el tamaño formateado
+     */
+    public String getFormattedTotalSize() {
+        long bytes = getTotalSize();
         if (bytes < 1024) return bytes + " B";
-        int exp = (int) (Math.log(bytes) / Math.log(1024));
-        char unit = "KMGTPE".charAt(exp-1);
-        return String.format("%.1f %sB", bytes / Math.pow(1024, exp), unit);
+        int exp = (int) (Math.log(bytes) / Math.log(1024)); // Calcula la unidad de tamaño
+        char unit = "KMGTPE".charAt(exp - 1);
+        return String.format("%.1f %sB", bytes / Math.pow(1024, exp), unit); // Devuelve el tamaño formateado
+    }
+
+    /**
+     * Obtiene la cantidad de archivos seleccionados
+     * 
+     * @return Número de archivos
+     */
+    public int getFileCount() {
+        return selectedFiles.size(); // Devuelve el número de archivos seleccionados
     }
 }
